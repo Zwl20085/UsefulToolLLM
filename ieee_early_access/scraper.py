@@ -5,10 +5,19 @@ Given a list of journal page URLs (e.g. https://ieeexplore.ieee.org/xpl/RecentIs
 this module extracts the publication number, queries the IEEE Xplore internal REST API,
 and returns the most-recent early-access papers.
 
-Robustness improvements over v1 (inspired by IEEEXplore-Tracker):
-  - Retry with exponential back-off on transient network errors
-  - Pagination: fetches multiple pages to reach the requested paper count
-  - Optional date filtering (days_back) to restrict results to recent papers
+API notes (as of 2025):
+  - The /rest/search endpoint requires POST with a JSON body (GET → 405).
+  - publicationNumber must be sent as integer field "punumber".
+  - queryText:"*" and contentType:"early-access" both cause HTTP 500;
+    instead we fetch all journal papers and filter client-side via isEarlyAccess.
+  - Session cookies (AWSALBAPP, WLSESSION) must be initialised by a prior
+    GET to the homepage before the search POST will succeed.
+
+Robustness features:
+  - Session cookie initialisation before first search request.
+  - Retry with exponential back-off on transient network errors.
+  - Pagination: fetches multiple pages to reach the requested paper count.
+  - Optional date filtering (days_back) to restrict results to recent papers.
 """
 
 from __future__ import annotations
@@ -23,10 +32,20 @@ import requests
 
 # ── constants ────────────────────────────────────────────────────────────────
 
+_IEEE_HOME = "https://ieeexplore.ieee.org/"
 _IEEE_SEARCH_API = "https://ieeexplore.ieee.org/rest/search"
 _IEEE_ABSTRACT_BASE = "https://ieeexplore.ieee.org/document/"
 
-_HEADERS = {
+_HEADERS_GET = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
+_HEADERS_POST = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -34,6 +53,8 @@ _HEADERS = {
     ),
     "Referer": "https://ieeexplore.ieee.org/",
     "Accept": "application/json, text/plain, */*",
+    "Content-Type": "application/json",
+    "Origin": "https://ieeexplore.ieee.org",
 }
 
 _REQUEST_TIMEOUT = 20   # seconds
@@ -125,17 +146,25 @@ def _parse_date(date_str: str) -> datetime | None:
     return None
 
 
-def _get_with_retry(
+def _init_session(session: requests.Session) -> None:
+    """GET the IEEE homepage to acquire required session cookies."""
+    try:
+        session.get(_IEEE_HOME, headers=_HEADERS_GET, timeout=_REQUEST_TIMEOUT)
+    except requests.RequestException:
+        pass  # proceed anyway; request may still work
+
+
+def _post_with_retry(
     session: requests.Session,
     url: str,
-    params: dict,
+    payload: dict,
     max_retries: int,
 ) -> requests.Response:
-    """GET with exponential back-off retries on transient errors."""
+    """POST JSON with exponential back-off retries on transient errors."""
     last_exc: Exception = RuntimeError("No attempts made")
     for attempt in range(max_retries):
         try:
-            resp = session.get(url, params=params, headers=_HEADERS, timeout=_REQUEST_TIMEOUT)
+            resp = session.post(url, json=payload, headers=_HEADERS_POST, timeout=_REQUEST_TIMEOUT)
             resp.raise_for_status()
             return resp
         except requests.RequestException as exc:
@@ -150,10 +179,10 @@ def _fetch_journal_name(pub_number: str, session: requests.Session) -> str:
     """Resolve the human-readable journal name from the publication metadata endpoint."""
     try:
         url = f"https://ieeexplore.ieee.org/rest/publication/home/metadata?pubid={pub_number}"
-        resp = session.get(url, headers=_HEADERS, timeout=_REQUEST_TIMEOUT)
+        resp = session.get(url, headers=_HEADERS_POST, timeout=_REQUEST_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
-        return data.get("publicationTitle", f"Journal {pub_number}")
+        return data.get("displayTitle") or data.get("publicationTitle") or f"Journal {pub_number}"
     except Exception:
         return f"Journal {pub_number}"
 
@@ -165,24 +194,30 @@ def _build_paper(record: dict, journal_name: str) -> Paper:
 
     authors_raw = record.get("authors", [])
     if isinstance(authors_raw, list):
-        authors = [a.get("preferredName") or a.get("normalizedName", "") for a in authors_raw]
+        authors = [
+            a.get("preferredName") or f"{a.get('firstName', '')} {a.get('lastName', '')}".strip()
+            for a in authors_raw
+        ]
     else:
         authors = []
 
-    pdf_link = ""
-    pdf_path = record.get("pdfPath", [])
-    if isinstance(pdf_path, list) and pdf_path:
-        pdf_link = "https://ieeexplore.ieee.org" + pdf_path[0]
+    # pdfLink is a relative path like "/stamp/stamp.jsp?tp=&arnumber=XXXXX"
+    pdf_link = record.get("pdfLink", "")
+    if pdf_link and not pdf_link.startswith("http"):
+        pdf_link = "https://ieeexplore.ieee.org" + pdf_link
     if not pdf_link and article_number:
         pdf_link = f"https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber={article_number}"
 
+    # publicationDate is null for early-access; fall back to publicationYear
+    pub_date = record.get("publicationDate") or record.get("publicationYear", "")
+
     return Paper(
-        title=record.get("title", "(no title)"),
+        title=record.get("articleTitle", "(no title)"),
         abstract=record.get("abstract", ""),
         authors=authors,
         doi=doi,
         article_number=article_number,
-        publication_date=record.get("onlineDateOfPublication") or record.get("publicationDate", ""),
+        publication_date=str(pub_date) if pub_date else "",
         journal_name=record.get("publicationTitle") or journal_name,
         url=(
             _IEEE_ABSTRACT_BASE + article_number
@@ -227,6 +262,7 @@ def fetch_early_access_papers(
     own_session = session is None
     if own_session:
         session = requests.Session()
+        _init_session(session)
 
     try:
         pub_number = _extract_pub_number(journal_url)
@@ -245,18 +281,22 @@ def fetch_early_access_papers(
     total_available = None  # learned after first page response
 
     while True:
-        params = {
-            "queryText": "*",
-            "newsearch": "true",
-            "sortType": "paper-pub-date",
-            "contentType": "early-access",
-            "publicationNumber": pub_number,
-            "rowsPerPage": str(_PAGE_SIZE),
-            "pageNumber": str(page),
+        # NOTE: queryText:"*" and contentType:"early-access" both cause HTTP 500.
+        # We fetch all journal papers and filter by isEarlyAccess client-side.
+        payload = {
+            "newsearch": True,
+            "highlight": True,
+            "returnFacets": ["ALL"],
+            "returnType": "SEARCH",
+            "matchPubs": True,
+            "punumber": int(pub_number),
+            "rowsPerPage": _PAGE_SIZE,
+            "pageNumber": page,
+            "sortType": "newest",
         }
 
         try:
-            resp = _get_with_retry(session, _IEEE_SEARCH_API, params, max_retries)
+            resp = _post_with_retry(session, _IEEE_SEARCH_API, payload, max_retries)
             data = resp.json()
         except requests.RequestException as exc:
             if own_session:
@@ -265,7 +305,8 @@ def fetch_early_access_papers(
                 journal_url=journal_url,
                 journal_name=journal_name,
                 pub_number=pub_number,
-                papers=[_build_paper(r, journal_name) for r in all_records],
+                papers=[_build_paper(r, journal_name) for r in all_records
+                        if r.get("isEarlyAccess")],
                 error=f"HTTP error on page {page}: {exc}",
             )
         except ValueError:
@@ -275,18 +316,20 @@ def fetch_early_access_papers(
                 journal_url=journal_url,
                 journal_name=journal_name,
                 pub_number=pub_number,
-                papers=[_build_paper(r, journal_name) for r in all_records],
+                papers=[_build_paper(r, journal_name) for r in all_records
+                        if r.get("isEarlyAccess")],
                 error=f"Invalid JSON in API response on page {page}",
             )
 
-        page_records = data.get("articles", [])
+        page_records = data.get("records", [])
         all_records.extend(page_records)
 
         if total_available is None:
             total_available = int(data.get("totalRecords", 0))
 
-        # Stop when we have enough or there are no more pages
-        enough = len(all_records) >= count
+        # Count only early-access records toward our target
+        ea_so_far = sum(1 for r in all_records if r.get("isEarlyAccess"))
+        enough = ea_so_far >= count
         no_more = not page_records or len(all_records) >= total_available
         if enough or no_more:
             break
@@ -294,7 +337,8 @@ def fetch_early_access_papers(
         page += 1
         time.sleep(_INTER_REQUEST_DELAY)
 
-    papers = [_build_paper(r, journal_name) for r in all_records[:count]]
+    ea_records = [r for r in all_records if r.get("isEarlyAccess")]
+    papers = [_build_paper(r, journal_name) for r in ea_records[:count]]
     papers = _filter_by_date(papers, days_back)
 
     if own_session:
@@ -317,6 +361,7 @@ def fetch_all_journals(
     """Fetch early-access papers for every URL in *journal_urls* sequentially."""
     results: list[JournalResult] = []
     with requests.Session() as session:
+        _init_session(session)
         for i, url in enumerate(journal_urls):
             print(f"  [{i + 1}/{len(journal_urls)}] Fetching: {url}")
             result = fetch_early_access_papers(
