@@ -6,7 +6,7 @@
   <title>IEEE Early Access Papers</title>
 
   <!-- Inter font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Font Awesome -->
@@ -18,11 +18,7 @@
         extend: {
           fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
           colors: {
-            ieee: {
-              DEFAULT: '#00629b',
-              dark:    '#004f7c',
-              light:   '#e8f1f7',
-            }
+            ieee: { DEFAULT: '#00629b', dark: '#004f7c', light: '#e8f1f7' }
           }
         }
       }
@@ -30,9 +26,11 @@
   </script>
 
   <style>
-    /* Abstract toggle */
-    .abstract-full          { display: none; }
-    .abstract-full.open     { display: inline; }
+    /* Abstract toggle states */
+    .abstract-short.collapsed    { display: block; }
+    .abstract-short.expanded     { display: none;  }
+    .abstract-full.collapsed     { display: none;  }
+    .abstract-full.expanded      { display: block; }
 
     /* Filter hide */
     .paper-card.hidden { display: none; }
@@ -42,6 +40,12 @@
       background-image: radial-gradient(circle, rgba(255,255,255,.15) 1px, transparent 1px);
       background-size: 28px 28px;
     }
+
+    /* Smooth card height transition */
+    .paper-card { transition: box-shadow 0.2s, border-color 0.2s; }
+
+    /* Left/right divider */
+    .card-right { border-left: 1.5px solid #e2e8f0; }
   </style>
 </head>
 
@@ -50,65 +54,55 @@
 <!-- ── Hero Header ─────────────────────────────────────────── -->
 <header class="relative overflow-hidden"
         style="background: linear-gradient(135deg, #001f3f 0%, #00629b 55%, #0083c9 100%);">
-
-  <!-- Dot-grid texture -->
   <div class="hero-dots absolute inset-0"></div>
-
-  <!-- Decorative blurred glow -->
   <div class="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-20"
        style="background: radial-gradient(circle, #60b8ff, transparent 70%);"></div>
 
-  <div class="relative max-w-5xl mx-auto px-6 pt-10 pb-16">
+  <div class="relative max-w-6xl mx-auto px-6 pt-10 pb-20">
     <div class="flex items-center gap-4">
-      <!-- Icon badge -->
       <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center flex-shrink-0 shadow-lg">
         <svg width="30" height="30" viewBox="0 0 36 36" fill="none">
           <path d="M21 5L11 21h8l-4 10 14-16h-9l1-10z" fill="white"/>
         </svg>
       </div>
-
       <div>
-        <h1 class="text-3xl font-bold text-white tracking-tight leading-tight">
+        <h1 class="text-3xl font-extrabold text-white tracking-tight leading-tight">
           ⚡ IEEE Early Access
         </h1>
         <p class="text-blue-200 text-sm mt-1">
           📡 Power Electronics &amp; Drives · Latest preprints
         </p>
       </div>
-
-      <!-- Refresh link — top-right -->
       <a href="/refresh"
-         class="ml-auto flex items-center gap-2 text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-all">
+         class="ml-auto flex items-center gap-2 text-sm font-semibold text-white/80
+                hover:text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-all">
         <i class="fa fa-rotate-right"></i> Refresh
       </a>
     </div>
-
     <p class="text-blue-200/60 text-xs mt-4">
       🕐 Data fetched at {{ fetch_time }}
     </p>
   </div>
 </header>
 
-<!-- ── Search + Filter bar (overlaps hero) ─────────────────── -->
-<div class="max-w-5xl mx-auto px-6 -mt-8 relative z-10">
-  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 p-4
+<!-- ── Search + Filter (overlaps hero) ────────────────────── -->
+<div class="max-w-6xl mx-auto px-6 -mt-10 relative z-10">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 p-5
               flex flex-wrap gap-3 items-center">
 
-    <!-- Search input -->
     <div class="relative flex-1 min-w-[220px]">
-      <i class="fa fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+      <i class="fa fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
       <input type="search" id="search-box"
              placeholder="Search title or abstract…"
              oninput="filterPapers()"
-             class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm
+             class="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm
                     focus:outline-none focus:border-ieee focus:ring-2 focus:ring-ieee/20 transition-all" />
     </div>
 
-    <!-- Journal filter -->
     <div class="flex items-center gap-2">
-      <i class="fa fa-filter text-slate-400 text-xs"></i>
+      <i class="fa fa-filter text-slate-400 text-sm"></i>
       <select id="journal-filter" onchange="filterPapers()"
-              class="py-2.5 px-3 rounded-xl border border-slate-200 text-sm bg-white
+              class="py-3 px-4 rounded-xl border border-slate-200 text-sm bg-white
                      focus:outline-none focus:border-ieee cursor-pointer transition-all">
         <option value="">📚 All journals</option>
         {% for result in results if not result.error %}
@@ -117,28 +111,27 @@
       </select>
     </div>
 
-    <!-- Stats label -->
-    <span id="stats-label" class="ml-auto text-xs text-slate-500 font-medium whitespace-nowrap"></span>
+    <span id="stats-label" class="ml-auto text-sm text-slate-500 font-medium whitespace-nowrap"></span>
   </div>
 </div>
 
 <!-- ── Main content ────────────────────────────────────────── -->
-<main class="max-w-5xl mx-auto px-6 pb-16 mt-8">
+<main class="max-w-6xl mx-auto px-6 pb-16 mt-10">
 
   {% for result in results %}
-  <section class="journal-section mb-10" data-pub="{{ result.pub_number }}">
+  <section class="journal-section mb-12" data-pub="{{ result.pub_number }}">
 
     <!-- Journal heading -->
-    <div class="flex items-center gap-3 mb-4 pb-3 border-b-2 border-ieee">
-      <h2 class="text-sm font-bold text-ieee flex-1 truncate">
+    <div class="flex items-center gap-3 mb-5 pb-4 border-b-2 border-ieee">
+      <h2 class="text-base font-bold text-ieee flex-1">
         📰 {{ result.journal_name }}
       </h2>
       <a href="{{ result.journal_url }}" target="_blank" rel="noopener"
-         class="text-xs text-ieee/70 hover:text-ieee transition-colors shrink-0">
+         class="text-sm text-ieee/70 hover:text-ieee transition-colors shrink-0">
         <i class="fa fa-arrow-up-right-from-square mr-1"></i>IEEE Xplore
       </a>
       {% if not result.error %}
-      <span class="bg-ieee/10 text-ieee text-xs font-semibold px-3 py-1 rounded-full shrink-0">
+      <span class="bg-ieee/10 text-ieee text-sm font-semibold px-3 py-1 rounded-full shrink-0">
         {{ result.papers | length }} papers
       </span>
       {% endif %}
@@ -146,83 +139,106 @@
 
     <!-- Error state -->
     {% if result.error %}
-    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-base text-amber-800">
       ⚠️ Could not fetch papers: {{ result.error }}
     </div>
 
     {% else %}
-    <!-- Papers grid -->
-    <div class="grid gap-3">
+    <!-- Papers list -->
+    <div class="flex flex-col gap-4">
       {% for paper in result.papers %}
-      <article class="paper-card bg-white rounded-xl border border-slate-100 shadow-sm
-                      hover:shadow-md hover:border-blue-200 transition-all duration-200 p-5"
+      <article class="paper-card bg-white rounded-2xl border border-slate-100 shadow-sm
+                      hover:shadow-lg hover:border-blue-200 p-6"
                data-pub="{{ result.pub_number }}"
                data-text="{{ (paper.title + ' ' + paper.abstract) | lower }}">
 
-        <!-- Title -->
-        <h3 class="text-sm font-semibold leading-snug mb-2.5">
-          <a href="{{ paper.url }}" target="_blank" rel="noopener"
-             class="text-slate-800 hover:text-ieee transition-colors">
-            {{ paper.title }}
-          </a>
-        </h3>
+        <!-- Two-column layout -->
+        <div class="flex flex-col sm:flex-row gap-0">
 
-        <!-- Meta row -->
-        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mb-3">
-          {% if paper.authors %}
-          <span>
-            <i class="fa fa-users mr-1 text-slate-400"></i>
-            {{ paper.authors[:4] | join(", ") }}{% if paper.authors | length > 4 %} <em>et al.</em>{% endif %}
-          </span>
-          {% endif %}
-          {% if paper.publication_date %}
-          <span>
-            <i class="fa fa-calendar-days mr-1 text-slate-400"></i>{{ paper.publication_date }}
-          </span>
-          {% endif %}
-          {% if paper.doi %}
-          <span class="font-mono">
-            <i class="fa fa-fingerprint mr-1 text-slate-400"></i>{{ paper.doi }}
-          </span>
-          {% endif %}
-        </div>
+          <!-- LEFT: Title + action buttons -->
+          <div class="sm:w-[40%] sm:flex-shrink-0 flex flex-col pr-6 pb-4 sm:pb-0">
+            <h3 class="text-lg font-bold leading-snug text-slate-800 mb-auto">
+              <a href="{{ paper.url }}" target="_blank" rel="noopener"
+                 class="hover:text-ieee transition-colors">
+                {{ paper.title }}
+              </a>
+            </h3>
 
-        <!-- Abstract -->
-        {% if paper.abstract %}
-        <p class="text-xs text-slate-600 leading-relaxed mb-3.5">
-          {{ paper.short_abstract -}}
-          {% if paper.abstract | length > 400 %}
-          <button class="abstract-toggle text-ieee hover:underline font-semibold ml-1 focus:outline-none"
-                  onclick="toggleAbstract(this)">Show more…</button>
-          <span class="abstract-full">{{ paper.abstract[400:] }}</span>
-          {% endif %}
-        </p>
-        {% endif %}
+            <!-- Action buttons pushed to bottom -->
+            <div class="flex gap-2 flex-wrap mt-5">
+              {% if paper.url %}
+              <a href="{{ paper.url }}" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg
+                        bg-ieee text-white text-sm font-semibold hover:bg-ieee-dark transition-colors">
+                <i class="fa fa-file-lines"></i> Abstract
+              </a>
+              {% endif %}
+              {% if paper.pdf_url %}
+              <a href="{{ paper.pdf_url }}" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg
+                        border border-ieee text-ieee text-sm font-semibold hover:bg-ieee-light transition-colors">
+                <i class="fa fa-file-pdf"></i> PDF
+              </a>
+              {% endif %}
+              {% if paper.doi %}
+              <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg
+                        border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-100 transition-colors">
+                <i class="fa fa-link"></i> DOI
+              </a>
+              {% endif %}
+            </div>
+          </div>
 
-        <!-- Action buttons -->
-        <div class="flex gap-2 flex-wrap">
-          {% if paper.url %}
-          <a href="{{ paper.url }}" target="_blank" rel="noopener"
-             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                    bg-ieee text-white text-xs font-semibold hover:bg-ieee-dark transition-colors">
-            <i class="fa fa-file-lines"></i> Abstract
-          </a>
-          {% endif %}
-          {% if paper.pdf_url %}
-          <a href="{{ paper.pdf_url }}" target="_blank" rel="noopener"
-             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                    border border-ieee text-ieee text-xs font-semibold hover:bg-ieee-light transition-colors">
-            <i class="fa fa-file-pdf"></i> PDF
-          </a>
-          {% endif %}
-          {% if paper.doi %}
-          <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener"
-             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                    border border-slate-200 text-slate-500 text-xs font-semibold hover:bg-slate-100 transition-colors">
-            <i class="fa fa-link"></i> DOI
-          </a>
-          {% endif %}
-        </div>
+          <!-- RIGHT: Authors + date + abstract -->
+          <div class="card-right flex-1 min-w-0 pl-6">
+
+            <!-- Meta -->
+            <div class="flex flex-col gap-1.5 mb-4">
+              {% if paper.authors %}
+              <div class="flex items-start gap-2 text-sm text-slate-600">
+                <i class="fa fa-users text-slate-400 mt-0.5 w-4 flex-shrink-0"></i>
+                <span>
+                  {{ paper.authors[:5] | join(", ") }}{% if paper.authors | length > 5 %} <em class="text-slate-400">et al.</em>{% endif %}
+                </span>
+              </div>
+              {% endif %}
+              {% if paper.publication_date %}
+              <div class="flex items-center gap-2 text-sm text-slate-500">
+                <i class="fa fa-calendar-days text-slate-400 w-4 flex-shrink-0"></i>
+                <span>{{ paper.publication_date }}</span>
+              </div>
+              {% endif %}
+              {% if paper.doi %}
+              <div class="flex items-center gap-2 text-sm text-slate-500 font-mono">
+                <i class="fa fa-fingerprint text-slate-400 w-4 flex-shrink-0"></i>
+                <span class="truncate">{{ paper.doi }}</span>
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- Abstract with toggle -->
+            {% if paper.abstract %}
+            <div class="abstract-region">
+              <!-- Short version (default) -->
+              <p class="abstract-short collapsed text-sm text-slate-600 leading-relaxed">
+                {{ paper.short_abstract }}
+              </p>
+              <!-- Full version (on expand) -->
+              <p class="abstract-full collapsed text-sm text-slate-600 leading-relaxed">
+                {{ paper.abstract }}
+              </p>
+              {% if paper.abstract | length > 400 %}
+              <button class="abstract-toggle mt-2 text-sm text-ieee font-semibold hover:underline focus:outline-none"
+                      onclick="toggleAbstract(this)">
+                Show more…
+              </button>
+              {% endif %}
+            </div>
+            {% endif %}
+
+          </div><!-- /right -->
+        </div><!-- /two-col -->
 
       </article>
       {% endfor %}
@@ -233,53 +249,67 @@
   {% endfor %}
 
   <!-- No-results state -->
-  <div id="no-results" class="hidden text-center py-20 text-slate-400">
+  <div id="no-results" class="hidden text-center py-24 text-slate-400">
     <i class="fa fa-magnifying-glass text-5xl block mb-4 opacity-20"></i>
-    <p class="text-base font-medium">No papers match your search.</p>
+    <p class="text-lg font-medium">No papers match your search.</p>
   </div>
 
 </main>
 
 <!-- ── Footer ──────────────────────────────────────────────── -->
-<footer class="text-center py-6 text-xs text-slate-400 border-t border-slate-100">
+<footer class="text-center py-6 text-sm text-slate-400 border-t border-slate-100">
   ⚡ IEEE Early Access Viewer ·
   <a href="/refresh" class="hover:text-ieee transition-colors">🔄 Refresh data</a>
 </footer>
 
 <script>
+  /* ── Abstract toggle ─────────────────────────────────────── */
   function toggleAbstract(btn) {
-    const full = btn.nextElementSibling;
-    full.classList.toggle("open");
-    btn.textContent = full.classList.contains("open") ? "Show less" : "Show more…";
+    const region   = btn.closest('.abstract-region');
+    const shortEl  = region.querySelector('.abstract-short');
+    const fullEl   = region.querySelector('.abstract-full');
+    const isOpen   = fullEl.classList.contains('expanded');
+
+    if (isOpen) {
+      // Collapse → show short, hide full
+      fullEl.classList.replace('expanded', 'collapsed');
+      shortEl.classList.replace('expanded', 'collapsed');
+      btn.textContent = 'Show more…';
+    } else {
+      // Expand → hide short, show full
+      shortEl.classList.replace('collapsed', 'expanded');
+      fullEl.classList.replace('collapsed', 'expanded');
+      btn.textContent = 'Show less';
+    }
   }
 
+  /* ── Paper filter ────────────────────────────────────────── */
   function filterPapers() {
-    const query     = document.getElementById("search-box").value.trim().toLowerCase();
-    const pubFilter = document.getElementById("journal-filter").value;
-    const cards     = document.querySelectorAll(".paper-card");
-    const sections  = document.querySelectorAll(".journal-section");
+    const query     = document.getElementById('search-box').value.trim().toLowerCase();
+    const pubFilter = document.getElementById('journal-filter').value;
+    const cards     = document.querySelectorAll('.paper-card');
+    const sections  = document.querySelectorAll('.journal-section');
 
     let visible = 0;
     cards.forEach(card => {
       const textMatch = !query     || card.dataset.text.includes(query);
       const pubMatch  = !pubFilter || card.dataset.pub === pubFilter;
       const show = textMatch && pubMatch;
-      card.classList.toggle("hidden", !show);
+      card.classList.toggle('hidden', !show);
       if (show) visible++;
     });
 
     sections.forEach(sec => {
-      const anyVisible = [...sec.querySelectorAll(".paper-card")].some(c => !c.classList.contains("hidden"));
-      sec.style.display = (pubFilter && sec.dataset.pub !== pubFilter) ? "none"
-                        : anyVisible ? "" : "none";
+      const anyVisible = [...sec.querySelectorAll('.paper-card')].some(c => !c.classList.contains('hidden'));
+      sec.style.display = (pubFilter && sec.dataset.pub !== pubFilter) ? 'none'
+                        : anyVisible ? '' : 'none';
     });
 
-    document.getElementById("no-results").classList.toggle("hidden", visible !== 0);
-    document.getElementById("stats-label").textContent =
-      visible + " paper" + (visible !== 1 ? "s" : "") + " shown";
+    document.getElementById('no-results').classList.toggle('hidden', visible !== 0);
+    document.getElementById('stats-label').textContent =
+      visible + ' paper' + (visible !== 1 ? 's' : '') + ' shown';
   }
 
-  // Initialise on load
   filterPapers();
 </script>
 </body>
