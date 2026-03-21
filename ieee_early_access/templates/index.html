@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IEEE Early Access Papers</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --card: #21263a;
+      --border: #2e344a;
+      --accent: #4f8ef7;
+      --accent2: #7c4dff;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --success: #22d3a5;
+      --error: #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header svg { flex-shrink: 0; }
+    header h1 { font-size: 1.5rem; font-weight: 700; }
+    header p  { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: calc(100vh - 70px);
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .sidebar label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .sidebar textarea {
+      width: 100%;
+      height: 200px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.78rem;
+      font-family: monospace;
+      resize: vertical;
+    }
+    .sidebar textarea:focus { outline: none; border-color: var(--accent); }
+
+    .row { display: flex; align-items: center; gap: 10px; }
+    .row label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+    .row input[type=number] {
+      width: 70px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+    }
+    .row input:focus { outline: none; border-color: var(--accent); }
+
+    .btn-fetch {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-fetch:hover  { background: #3a7bf0; }
+    .btn-fetch:active { background: #2a6bdf; }
+    .btn-fetch:disabled { background: #334; cursor: not-allowed; }
+
+    .status {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .status.err { color: var(--error); }
+
+    /* ── Main content ── */
+    .main {
+      padding: 28px 36px;
+      overflow-y: auto;
+    }
+
+    .placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 60vh;
+      color: var(--muted);
+      gap: 12px;
+      text-align: center;
+    }
+    .placeholder svg { opacity: .3; }
+    .placeholder p { font-size: 0.95rem; }
+
+    /* Journal section */
+    .journal-section { margin-bottom: 48px; }
+    .journal-header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border);
+    }
+    .journal-header h2 { font-size: 1.1rem; font-weight: 700; }
+    .journal-header .badge {
+      font-size: 0.72rem;
+      background: var(--accent2);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .journal-header a {
+      font-size: 0.78rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-left: auto;
+    }
+    .journal-header a:hover { text-decoration: underline; }
+
+    .no-papers { color: var(--muted); font-size: 0.88rem; }
+    .error-msg { color: var(--error); font-size: 0.88rem; }
+
+    /* Paper cards */
+    .papers-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .paper-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .paper-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent)22;
+    }
+
+    .paper-title {
+      font-size: 0.97rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+    .paper-title a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .paper-title a:hover { color: var(--accent); }
+
+    .paper-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .paper-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .paper-abstract {
+      font-size: 0.82rem;
+      color: #9aa3b5;
+      line-height: 1.6;
+      overflow: hidden;
+      transition: max-height .3s ease;
+    }
+    .paper-abstract.collapsed { max-height: 4.8em; }
+    .paper-abstract.expanded  { max-height: 9999px; }
+
+    .toggle-abstract {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 0.76rem;
+      color: var(--accent);
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-abstract:hover { text-decoration: underline; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+      .main { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+    <rect width="36" height="36" rx="8" fill="#4f8ef7"/>
+    <path d="M9 27V9h4l5 9 5-9h4v18h-4V15l-5 9-5-9v12H9z" fill="white"/>
+  </svg>
+  <div>
+    <h1>IEEE Early Access Papers</h1>
+    <p>Fetch the latest early-access articles from IEEE Xplore journals</p>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div>
+      <label>Journal URLs (one per line)</label>
+      <textarea id="journal-urls" spellcheck="false">{{ default_journals }}</textarea>
+    </div>
+    <div class="row">
+      <label>Max papers per journal</label>
+      <input type="number" id="max-papers" value="30" min="1" max="100" />
+    </div>
+    <button class="btn-fetch" id="fetch-btn" onclick="fetchPapers()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.65 6.35A7.96 7.96 0 0012 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8h-2c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+      </svg>
+      Fetch Papers
+    </button>
+    <div class="status" id="status-msg"></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" id="main-content">
+    <div class="placeholder" id="placeholder">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--muted)">
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+      </svg>
+      <p>Configure journal URLs on the left, then click <strong>Fetch Papers</strong>.</p>
+    </div>
+    <div id="results-container"></div>
+  </main>
+</div>
+
+<script>
+  async function fetchPapers() {
+    const btn = document.getElementById('fetch-btn');
+    const statusEl = document.getElementById('status-msg');
+    const placeholder = document.getElementById('placeholder');
+    const container = document.getElementById('results-container');
+
+    const rawUrls = document.getElementById('journal-urls').value;
+    const maxPapers = parseInt(document.getElementById('max-papers').value) || 30;
+    const urls = rawUrls.split('\n').map(u => u.trim()).filter(Boolean);
+
+    if (!urls.length) {
+      statusEl.textContent = 'Please enter at least one journal URL.';
+      statusEl.className = 'status err';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Fetching…';
+    statusEl.className = 'status';
+    statusEl.textContent = `Querying ${urls.length} journal(s)…`;
+    placeholder.style.display = 'none';
+    container.innerHTML = '';
+
+    try {
+      const resp = await fetch('/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls, max_papers: maxPapers }),
+      });
+      if (!resp.ok) throw new Error(`Server error ${resp.status}`);
+      const data = await resp.json();
+      renderResults(data, container);
+      const total = data.reduce((s, j) => s + (j.papers ? j.papers.length : 0), 0);
+      statusEl.textContent = `Loaded ${total} papers from ${data.length} journal(s).`;
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'status err';
+      placeholder.style.display = 'flex';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.65 6.35A7.96 7.96 0 0012 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8h-2c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+        Fetch Papers`;
+    }
+  }
+
+  function renderResults(data, container) {
+    data.forEach(journal => {
+      const section = document.createElement('div');
+      section.className = 'journal-section';
+
+      const count = (journal.papers || []).length;
+      section.innerHTML = `
+        <div class="journal-header">
+          <h2>${escapeHtml(journal.journal_name)}</h2>
+          ${count ? `<span class="badge">${count} papers</span>` : ''}
+          <a href="${escapeHtml(journal.journal_url)}" target="_blank" rel="noopener">Open Journal ↗</a>
+        </div>`;
+
+      if (journal.error) {
+        section.innerHTML += `<p class="error-msg">⚠ ${escapeHtml(journal.error)}</p>`;
+      } else if (!count) {
+        section.innerHTML += `<p class="no-papers">No early-access papers found.</p>`;
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'papers-grid';
+        journal.papers.forEach(p => grid.appendChild(makePaperCard(p)));
+        section.appendChild(grid);
+      }
+
+      container.appendChild(section);
+    });
+  }
+
+  function makePaperCard(paper) {
+    const card = document.createElement('div');
+    card.className = 'paper-card';
+
+    const authorsStr = (paper.authors || []).slice(0, 5).join(', ')
+      + (paper.authors.length > 5 ? ' et al.' : '');
+
+    card.innerHTML = `
+      <div class="paper-title">
+        ${paper.url
+          ? `<a href="${escapeHtml(paper.url)}" target="_blank" rel="noopener">${escapeHtml(paper.title)}</a>`
+          : escapeHtml(paper.title)}
+      </div>
+      <div class="paper-meta">
+        ${authorsStr ? `<span>👤 ${escapeHtml(authorsStr)}</span>` : ''}
+        ${paper.publication_date ? `<span>📅 ${escapeHtml(paper.publication_date)}</span>` : ''}
+        ${paper.doi ? `<span>🔗 <a href="https://doi.org/${escapeHtml(paper.doi)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHtml(paper.doi)}</a></span>` : ''}
+      </div>
+      <div class="paper-abstract collapsed" id="abs-${uniqueId()}">
+        ${escapeHtml(paper.abstract)}
+      </div>
+      <span class="toggle-abstract" onclick="toggleAbstract(this)">Show more ▾</span>
+    `;
+    return card;
+  }
+
+  function toggleAbstract(btn) {
+    const absEl = btn.previousElementSibling;
+    if (absEl.classList.contains('collapsed')) {
+      absEl.classList.replace('collapsed', 'expanded');
+      btn.textContent = 'Show less ▴';
+    } else {
+      absEl.classList.replace('expanded', 'collapsed');
+      btn.textContent = 'Show more ▾';
+    }
+  }
+
+  let _uid = 0;
+  function uniqueId() { return ++_uid; }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
