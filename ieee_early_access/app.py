@@ -43,10 +43,10 @@ def _now_str() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
-def _do_fetch(journal_urls: list[str], count: int) -> None:
+def _do_fetch(journal_urls: list[str], count: int, days_back: int | None, max_retries: int) -> None:
     """Populate the in-memory cache (runs in a background thread)."""
     print(f"\nFetching {count} early-access papers from {len(journal_urls)} journal(s)…")
-    results = fetch_all_journals(journal_urls, count=count)
+    results = fetch_all_journals(journal_urls, count=count, days_back=days_back, max_retries=max_retries)
     _cache["results"] = results
     _cache["fetch_time"] = _now_str()
     total = sum(len(r.papers) for r in results)
@@ -78,8 +78,10 @@ def refresh():
     """Re-fetch all journals and redirect back to the main page."""
     urls = app.config["JOURNAL_URLS"]
     count = app.config["PAPER_COUNT"]
+    days_back = app.config["DAYS_BACK"]
+    max_retries = app.config["MAX_RETRIES"]
     # Run in background so the redirect happens immediately
-    Thread(target=_do_fetch, args=(urls, count), daemon=True).start()
+    Thread(target=_do_fetch, args=(urls, count, days_back, max_retries), daemon=True).start()
     return redirect(url_for("index"))
 
 
@@ -90,10 +92,16 @@ def health():
 
 # ── static export ─────────────────────────────────────────────────────────────
 
-def export_html(journal_urls: list[str], count: int, output_path: str) -> None:
+def export_html(
+    journal_urls: list[str],
+    count: int,
+    output_path: str,
+    days_back: int | None = None,
+    max_retries: int = 3,
+) -> None:
     """Fetch papers and write a single self-contained HTML file."""
     print(f"Exporting to {output_path} …")
-    results = fetch_all_journals(journal_urls, count=count)
+    results = fetch_all_journals(journal_urls, count=count, days_back=days_back, max_retries=max_retries)
     fetch_time = _now_str()
 
     with app.app_context():
@@ -146,6 +154,20 @@ Examples:
         help="Do not open a browser window automatically",
     )
     parser.add_argument(
+        "--days-back",
+        type=int,
+        default=config.DAYS_BACK,
+        metavar="N",
+        help="Only show papers published within the last N days (default: no filter)",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=config.MAX_RETRIES,
+        metavar="N",
+        help=f"Retry attempts per request on network errors (default: {config.MAX_RETRIES})",
+    )
+    parser.add_argument(
         "--export",
         metavar="FILE",
         help="Export a static HTML file instead of starting the server",
@@ -163,15 +185,17 @@ def main() -> None:
 
     # ── static export mode ────────────────────────────────────────────────────
     if args.export:
-        export_html(journal_urls, args.count, args.export)
+        export_html(journal_urls, args.count, args.export, days_back=args.days_back, max_retries=args.max_retries)
         return
 
     # ── web server mode ───────────────────────────────────────────────────────
     app.config["JOURNAL_URLS"] = journal_urls
     app.config["PAPER_COUNT"] = args.count
+    app.config["DAYS_BACK"] = args.days_back
+    app.config["MAX_RETRIES"] = args.max_retries
 
     # Kick off background fetch so the server starts immediately
-    Thread(target=_do_fetch, args=(journal_urls, args.count), daemon=True).start()
+    Thread(target=_do_fetch, args=(journal_urls, args.count, args.days_back, args.max_retries), daemon=True).start()
 
     url = f"http://localhost:{args.port}"
     print(f"\n{'='*50}")

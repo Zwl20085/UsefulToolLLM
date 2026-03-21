@@ -14,25 +14,33 @@ You can also provide just the publication number (e.g. "34").
 """
 
 # ── Journal URLs to monitor ───────────────────────────────────────────────────
-# Default list covers a selection of flagship IEEE Transactions journals.
-# Modify freely.
+# Power electronics & electric drives journals.
 
 JOURNAL_URLS: list[str] = [
-    # IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI)
-    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=34",
+    # IEEE Transactions on Industrial Electronics (TIE) — punumber=41
+    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=41",
 
-    # IEEE Transactions on Neural Networks and Learning Systems (TNNLS)
-    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=5962385",
+    # IEEE Transactions on Energy Conversion (TEC) — punumber=60
+    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=60",
 
-    # IEEE Transactions on Image Processing (TIP)
-    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=83",
+    # IEEE Transactions on Industry Applications (TIA) — punumber=28
+    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=28",
 
-    # IEEE Transactions on Cybernetics
-    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=6221036",
+    # IEEE Transactions on Transportation Electrification (TTE) — punumber=6687316
+    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=6687316",
 
-    # IEEE Transactions on Knowledge and Data Engineering (TKDE)
-    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=69",
+    # IEEE/ASME Transactions on Mechatronics (TMECH) — punumber=3516
+    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=3516",
+
+    # IEEE Transactions on Power Electronics (TPEL) — punumber=63
+    "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=63",
 ]
 
 # Number of early-access papers to retrieve per journal (max recommended: 100)
 PAPER_COUNT: int = 30
+
+# Only show papers published within this many days (None = no date filter)
+DAYS_BACK: int | None = None
+
+# Retry attempts on transient network errors (per request)
+MAX_RETRIES: int = 3
