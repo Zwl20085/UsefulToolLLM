@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IEEE Early Access Papers</title>
+  <style>
+    /* ── reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: #f4f6fb;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    /* ── header ── */
+    header {
+      background: #00629b;          /* IEEE blue */
+      color: #fff;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header svg { flex-shrink: 0; }
+    header h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+    header .subtitle { font-size: 0.85rem; opacity: .8; margin-top: .15rem; }
+
+    /* ── layout ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+    /* ── controls bar ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .controls input[type="search"] {
+      flex: 1 1 260px;
+      padding: .55rem .9rem;
+      border: 1px solid #c5ccd8;
+      border-radius: 6px;
+      font-size: .9rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .controls input[type="search"]:focus { border-color: #00629b; }
+    .controls label { font-size: .85rem; color: #555; }
+    .controls select {
+      padding: .5rem .8rem;
+      border: 1px solid #c5ccd8;
+      border-radius: 6px;
+      font-size: .85rem;
+      background: #fff;
+      cursor: pointer;
+    }
+    .stats { margin-left: auto; font-size: .82rem; color: #666; }
+
+    /* ── journal section ── */
+    .journal-section { margin-bottom: 2.5rem; }
+    .journal-header {
+      display: flex;
+      align-items: baseline;
+      gap: .75rem;
+      padding: .6rem 0 .5rem;
+      border-bottom: 2px solid #00629b;
+      margin-bottom: 1rem;
+    }
+    .journal-header h2 { font-size: 1.15rem; color: #00629b; }
+    .journal-header a {
+      font-size: .78rem;
+      color: #00629b;
+      text-decoration: none;
+      opacity: .75;
+    }
+    .journal-header a:hover { opacity: 1; text-decoration: underline; }
+    .badge {
+      margin-left: auto;
+      background: #e8f1f7;
+      color: #00629b;
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .2rem .55rem;
+      border-radius: 999px;
+    }
+
+    /* ── error banner ── */
+    .error-banner {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: .75rem 1rem;
+      font-size: .88rem;
+      color: #665000;
+    }
+
+    /* ── paper card ── */
+    .papers-grid {
+      display: grid;
+      gap: .9rem;
+    }
+    .paper-card {
+      background: #fff;
+      border: 1px solid #e0e5ee;
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      transition: box-shadow .2s, border-color .2s;
+    }
+    .paper-card:hover {
+      box-shadow: 0 4px 14px rgba(0,0,0,.1);
+      border-color: #9ec5e0;
+    }
+
+    .paper-title {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: .4rem;
+    }
+    .paper-title a {
+      color: #003d6b;
+      text-decoration: none;
+    }
+    .paper-title a:hover { text-decoration: underline; color: #00629b; }
+
+    .paper-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem .75rem;
+      font-size: .78rem;
+      color: #666;
+      margin-bottom: .6rem;
+    }
+    .paper-meta .authors { color: #444; }
+    .paper-meta .date::before { content: "📅 "; }
+
+    .paper-abstract {
+      font-size: .87rem;
+      color: #444;
+      line-height: 1.6;
+      margin-bottom: .75rem;
+    }
+    .abstract-toggle {
+      background: none;
+      border: none;
+      color: #00629b;
+      font-size: .8rem;
+      cursor: pointer;
+      padding: 0;
+      margin-left: .3rem;
+    }
+    .abstract-full { display: none; }
+    .abstract-full.open { display: inline; }
+
+    .paper-links { display: flex; gap: .6rem; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .32rem .75rem;
+      border-radius: 5px;
+      font-size: .78rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1.5px solid transparent;
+      transition: background .15s, color .15s;
+    }
+    .btn-primary {
+      background: #00629b;
+      color: #fff;
+      border-color: #00629b;
+    }
+    .btn-primary:hover { background: #004f7c; }
+    .btn-secondary {
+      background: #fff;
+      color: #00629b;
+      border-color: #00629b;
+    }
+    .btn-secondary:hover { background: #e8f1f7; }
+
+    /* ── hidden by filter ── */
+    .paper-card.hidden { display: none; }
+
+    /* ── fetch timestamp ── */
+    .fetch-time {
+      text-align: right;
+      font-size: .78rem;
+      color: #aaa;
+      margin-top: -.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── empty state ── */
+    .no-results {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #999;
+      font-size: .95rem;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.1rem; }
+      .paper-title { font-size: .92rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <!-- IEEE-ish lightning bolt icon -->
+  <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="36" height="36" rx="7" fill="white" fill-opacity="0.15"/>
+    <path d="M21 5L11 21h8l-4 10 14-16h-9l1-10z" fill="white"/>
+  </svg>
+  <div>
+    <h1>IEEE Early Access Papers</h1>
+    <div class="subtitle">Latest publications · fetched {{ fetch_time }}</div>
+  </div>
+</header>
+
+<main>
+  <!-- controls -->
+  <div class="controls">
+    <input type="search" id="search-box" placeholder="Search title or abstract…" oninput="filterPapers()" />
+    <label for="journal-filter">Journal:</label>
+    <select id="journal-filter" onchange="filterPapers()">
+      <option value="">All journals</option>
+      {% for result in results if not result.error %}
+      <option value="{{ result.pub_number }}">{{ result.journal_name }}</option>
+      {% endfor %}
+    </select>
+    <span class="stats" id="stats-label"></span>
+  </div>
+
+  <div class="fetch-time">Data fetched at {{ fetch_time }}</div>
+
+  {% for result in results %}
+  <section class="journal-section" data-pub="{{ result.pub_number }}">
+    <div class="journal-header">
+      <h2>{{ result.journal_name }}</h2>
+      <a href="{{ result.journal_url }}" target="_blank" rel="noopener">↗ IEEE Xplore</a>
+      {% if not result.error %}
+      <span class="badge">{{ result.papers | length }} papers</span>
+      {% endif %}
+    </div>
+
+    {% if result.error %}
+    <div class="error-banner">⚠ Could not fetch papers: {{ result.error }}</div>
+    {% else %}
+    <div class="papers-grid">
+      {% for paper in result.papers %}
+      <article class="paper-card" data-pub="{{ result.pub_number }}"
+               data-text="{{ (paper.title + ' ' + paper.abstract) | lower }}">
+        <div class="paper-title">
+          <a href="{{ paper.url }}" target="_blank" rel="noopener">{{ paper.title }}</a>
+        </div>
+        <div class="paper-meta">
+          <span class="authors">{{ paper.authors[:4] | join(", ") }}{% if paper.authors | length > 4 %} et al.{% endif %}</span>
+          {% if paper.publication_date %}<span class="date">{{ paper.publication_date }}</span>{% endif %}
+          {% if paper.doi %}<span>DOI: {{ paper.doi }}</span>{% endif %}
+        </div>
+        {% if paper.abstract %}
+        <p class="paper-abstract">
+          {{ paper.short_abstract }}
+          {% if paper.abstract | length > 400 %}
+          <button class="abstract-toggle" onclick="toggleAbstract(this)">Show more</button>
+          <span class="abstract-full">{{ paper.abstract[400:] }}</span>
+          {% endif %}
+        </p>
+        {% endif %}
+        <div class="paper-links">
+          {% if paper.url %}
+          <a class="btn btn-primary" href="{{ paper.url }}" target="_blank" rel="noopener">
+            Abstract
+          </a>
+          {% endif %}
+          {% if paper.pdf_url %}
+          <a class="btn btn-secondary" href="{{ paper.pdf_url }}" target="_blank" rel="noopener">
+            PDF
+          </a>
+          {% endif %}
+          {% if paper.doi %}
+          <a class="btn btn-secondary" href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener">
+            DOI
+          </a>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <div class="no-results" id="no-results" style="display:none">No papers match your search.</div>
+</main>
+
+<script>
+  function toggleAbstract(btn) {
+    const full = btn.nextElementSibling;
+    full.classList.toggle("open");
+    btn.textContent = full.classList.contains("open") ? "Show less" : "Show more";
+  }
+
+  function filterPapers() {
+    const query = document.getElementById("search-box").value.trim().toLowerCase();
+    const pubFilter = document.getElementById("journal-filter").value;
+    const cards = document.querySelectorAll(".paper-card");
+    const sections = document.querySelectorAll(".journal-section");
+
+    let visible = 0;
+    cards.forEach(card => {
+      const textMatch = !query || card.dataset.text.includes(query);
+      const pubMatch  = !pubFilter || card.dataset.pub === pubFilter;
+      const show = textMatch && pubMatch;
+      card.classList.toggle("hidden", !show);
+      if (show) visible++;
+    });
+
+    // hide entire section if all its cards are hidden
+    sections.forEach(sec => {
+      const anyVisible = [...sec.querySelectorAll(".paper-card")].some(c => !c.classList.contains("hidden"));
+      sec.style.display = (pubFilter && sec.dataset.pub !== pubFilter) ? "none"
+                        : anyVisible ? "" : "none";
+    });
+
+    document.getElementById("no-results").style.display = visible === 0 ? "" : "none";
+    document.getElementById("stats-label").textContent =
+      visible + " paper" + (visible !== 1 ? "s" : "") + " shown";
+  }
+
+  // init stats
+  filterPapers();
+</script>
+</body>
+</html>
