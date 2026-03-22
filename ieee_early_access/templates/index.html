@@ -230,7 +230,9 @@
               </p>
               {% if paper.abstract | length > 400 %}
               <button class="abstract-toggle mt-2 text-sm text-ieee font-semibold hover:underline focus:outline-none"
-                      onclick="toggleAbstract(this)">
+                      onclick="toggleAbstract(this)"
+                      data-article="{{ paper.article_number }}"
+                      data-loaded="false">
                 Show more…
               </button>
               {% endif %}
@@ -263,24 +265,45 @@
 </footer>
 
 <script>
-  /* ── Abstract toggle ─────────────────────────────────────── */
-  function toggleAbstract(btn) {
-    const region   = btn.closest('.abstract-region');
-    const shortEl  = region.querySelector('.abstract-short');
-    const fullEl   = region.querySelector('.abstract-full');
-    const isOpen   = fullEl.classList.contains('expanded');
+  /* ── Abstract toggle (lazy-fetches full abstract on first expand) ── */
+  async function toggleAbstract(btn) {
+    const region  = btn.closest('.abstract-region');
+    const shortEl = region.querySelector('.abstract-short');
+    const fullEl  = region.querySelector('.abstract-full');
+    const isOpen  = fullEl.classList.contains('expanded');
 
     if (isOpen) {
-      // Collapse → show short, hide full
+      // Collapse
       fullEl.classList.replace('expanded', 'collapsed');
       shortEl.classList.replace('expanded', 'collapsed');
       btn.textContent = 'Show more…';
-    } else {
-      // Expand → hide short, show full
-      shortEl.classList.replace('collapsed', 'expanded');
-      fullEl.classList.replace('collapsed', 'expanded');
-      btn.textContent = 'Show less';
+      return;
     }
+
+    // First expand: fetch full abstract from proxy if not already loaded
+    const articleId = btn.dataset.article;
+    if (articleId && btn.dataset.loaded !== 'true') {
+      const prev = btn.textContent;
+      btn.textContent = '⏳ Loading…';
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/abstract/' + articleId);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.abstract) {
+            fullEl.textContent = data.abstract;
+            btn.dataset.loaded = 'true';
+          }
+        }
+      } catch (_) { /* fall back to whatever the template already rendered */ }
+      btn.disabled = false;
+      btn.textContent = prev;
+    }
+
+    // Expand
+    shortEl.classList.replace('collapsed', 'expanded');
+    fullEl.classList.replace('collapsed', 'expanded');
+    btn.textContent = 'Show less';
   }
 
   /* ── Paper filter ────────────────────────────────────────── */

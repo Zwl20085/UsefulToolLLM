@@ -352,6 +352,29 @@ def fetch_early_access_papers(
     )
 
 
+def fetch_article_abstract(article_number: str, session: requests.Session | None = None) -> str:
+    """Fetch the full abstract for one article from the IEEE Xplore document API.
+
+    The /rest/search endpoint returns truncated abstracts; this endpoint returns
+    the complete text.
+    """
+    own_session = session is None
+    if own_session:
+        session = requests.Session()
+        _init_session(session)
+    try:
+        url = f"https://ieeexplore.ieee.org/rest/document/{article_number}"
+        resp = session.get(url, headers=_HEADERS_POST, timeout=_REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("abstract") or data.get("abstractText") or ""
+    except Exception:
+        return ""
+    finally:
+        if own_session:
+            session.close()
+
+
 def fetch_all_journals(
     journal_urls: list[str],
     count: int = 30,

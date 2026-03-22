@@ -22,7 +22,7 @@ from threading import Thread
 
 from flask import Flask, render_template, redirect, url_for
 
-from scraper import fetch_all_journals, JournalResult
+from scraper import fetch_all_journals, fetch_article_abstract, JournalResult
 import config
 
 # ── Flask setup ───────────────────────────────────────────────────────────────
@@ -88,6 +88,15 @@ def refresh():
 @app.route("/health")
 def health():
     return {"status": "ok", "fetch_time": _cache["fetch_time"]}
+
+
+@app.route("/abstract/<article_number>")
+def get_abstract(article_number: str):
+    """Proxy: return the full abstract text for one IEEE article as JSON."""
+    if not article_number.isdigit():
+        return {"abstract": ""}, 400
+    abstract = fetch_article_abstract(article_number)
+    return {"abstract": abstract}
 
 
 # ── static export ─────────────────────────────────────────────────────────────
