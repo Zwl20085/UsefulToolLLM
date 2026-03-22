@@ -560,9 +560,9 @@ def fetch_all_journals(
                 session=session,
             )
             if result.error:
-                print(f"    ⚠  Error: {result.error}")
+                print(f"    [!] Error: {result.error}")
             else:
-                print(f"    ✓  {result.journal_name}: {len(result.papers)} papers")
+                print(f"    [ok] {result.journal_name}: {len(result.papers)} papers")
             results.append(result)
 
             if i < len(journal_urls) - 1:

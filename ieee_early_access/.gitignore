@@ -1,0 +1,9 @@
+# PyInstaller build artefacts (auto-generated — do not commit)
+build/
+dist/
+IEEE_Early_Access.spec
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo

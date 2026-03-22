@@ -27,7 +27,10 @@ import config
 
 # ── Flask setup ───────────────────────────────────────────────────────────────
 
-TEMPLATE_DIR = Path(__file__).parent / "templates"
+# When packaged with PyInstaller, __file__ points inside a temp folder (_MEIPASS).
+# We resolve the templates/ path from there so Flask can find index.html.
+_BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+TEMPLATE_DIR = _BASE_DIR / "templates"
 app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
 
 # In-memory cache: refreshed on startup and on /refresh
@@ -45,12 +48,12 @@ def _now_str() -> str:
 
 def _do_fetch(journal_urls: list[str], count: int, days_back: int | None, max_retries: int) -> None:
     """Populate the in-memory cache (runs in a background thread)."""
-    print(f"\nFetching {count} early-access papers from {len(journal_urls)} journal(s)…")
+    print(f"\nFetching {count} early-access papers from {len(journal_urls)} journal(s)...")
     results = fetch_all_journals(journal_urls, count=count, days_back=days_back, max_retries=max_retries)
     _cache["results"] = results
     _cache["fetch_time"] = _now_str()
     total = sum(len(r.papers) for r in results)
-    print(f"Done — {total} papers fetched at {_cache['fetch_time']}\n")
+    print(f"Done - {total} papers fetched at {_cache['fetch_time']}\n")
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -122,7 +125,7 @@ def export_html(
     max_retries: int = 3,
 ) -> None:
     """Fetch papers and write a single self-contained HTML file."""
-    print(f"Exporting to {output_path} …")
+    print(f"Exporting to {output_path} ...")
     results = fetch_all_journals(journal_urls, count=count, days_back=days_back, max_retries=max_retries)
     fetch_time = _now_str()
 
@@ -194,6 +197,13 @@ Examples:
         metavar="FILE",
         help="Export a static HTML file instead of starting the server",
     )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        metavar="HOST",
+        help="Host/IP to listen on (default: 127.0.0.1). "
+             "Use 0.0.0.0 to expose on the local network.",
+    )
     return parser.parse_args()
 
 
@@ -219,7 +229,8 @@ def main() -> None:
     # Kick off background fetch so the server starts immediately
     Thread(target=_do_fetch, args=(journal_urls, args.count, args.days_back, args.max_retries), daemon=True).start()
 
-    url = f"http://localhost:{args.port}"
+    host = args.host
+    url = f"http://{host}:{args.port}"
     print(f"\n{'='*50}")
     print(f"  IEEE Early Access Viewer")
     print(f"  Serving at: {url}")
@@ -229,16 +240,26 @@ def main() -> None:
 
     if not args.no_browser:
         # Open browser after a short delay so Flask has time to start
+        browser_url = f"http://127.0.0.1:{args.port}"
         Thread(
             target=lambda: (
                 __import__("time").sleep(1.5),
-                webbrowser.open(url),
+                webbrowser.open(browser_url),
             ),
             daemon=True,
         ).start()
 
-    app.run(host="0.0.0.0", port=args.port, debug=False)
+    app.run(host=host, port=args.port, debug=False)
 
 
 if __name__ == "__main__":
-    main()
+    import traceback
+    try:
+        main()
+    except Exception:
+        traceback.print_exc()
+    finally:
+        # When running as a frozen .exe (double-clicked), keep the console open
+        # so the user can read any error message before the window closes.
+        if getattr(sys, "frozen", False):
+            input("\nPress Enter to exit…")

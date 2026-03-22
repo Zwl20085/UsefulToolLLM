@@ -67,10 +67,10 @@
       </div>
       <div>
         <h1 class="text-3xl font-extrabold text-white tracking-tight leading-tight">
-          ⚡ IEEE Early Access
+          IEEE Early Access Publications
         </h1>
-        <p class="text-blue-200 text-sm mt-1">
-          📡 Power Electronics &amp; Drives · Latest preprints
+        <p class="text-blue-200 text-2xl mt-1">
+          Power Electronics &amp; Drives · Latest preprints
         </p>
       </div>
       <a href="/refresh"
@@ -87,22 +87,22 @@
 
 <!-- ── Search + Filter (overlaps hero) ────────────────────── -->
 <div class="px-[5vw] -mt-10 relative z-10">
-  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 p-5
-              flex flex-wrap gap-3 items-center">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 p-6
+              flex flex-wrap gap-4 items-center">
 
     <div class="relative flex-1 min-w-[220px]">
-      <i class="fa fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+      <i class="fa fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
       <input type="search" id="search-box"
              placeholder="Search title or abstract…"
              oninput="filterPapers()"
-             class="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm
+             class="w-full pl-12 pr-5 py-4 rounded-xl border border-slate-200 text-lg
                     focus:outline-none focus:border-ieee focus:ring-2 focus:ring-ieee/20 transition-all" />
     </div>
 
-    <div class="flex items-center gap-2">
-      <i class="fa fa-filter text-slate-400 text-sm"></i>
+    <div class="flex items-center gap-3">
+      <i class="fa fa-filter text-slate-400 text-lg"></i>
       <select id="journal-filter" onchange="filterPapers()"
-              class="py-3 px-4 rounded-xl border border-slate-200 text-sm bg-white
+              class="py-4 px-5 rounded-xl border border-slate-200 text-lg bg-white
                      focus:outline-none focus:border-ieee cursor-pointer transition-all">
         <option value="">📚 All journals</option>
         {% for result in results if not result.error %}
@@ -111,7 +111,7 @@
       </select>
     </div>
 
-    <span id="stats-label" class="ml-auto text-sm text-slate-500 font-medium whitespace-nowrap"></span>
+    <span id="stats-label" class="ml-auto text-base text-slate-500 font-medium whitespace-nowrap"></span>
   </div>
 </div>
 
@@ -123,7 +123,7 @@
 
     <!-- Journal heading -->
     <div class="flex items-center gap-3 mb-5 pb-4 border-b-2 border-ieee">
-      <h2 class="text-base font-bold text-ieee flex-1">
+      <h2 class="text-2xl font-bold text-ieee flex-1">
         📰 {{ result.journal_name }}
       </h2>
       <a href="{{ result.journal_url }}" target="_blank" rel="noopener"
@@ -157,7 +157,7 @@
 
           <!-- LEFT: Title + action buttons -->
           <div class="sm:w-[40%] sm:flex-shrink-0 flex flex-col pr-6 pb-4 sm:pb-0">
-            <h3 class="text-lg font-bold leading-snug text-slate-800 mb-auto">
+            <h3 class="text-3xl font-bold leading-snug text-slate-800 mb-auto">
               <a href="{{ paper.url }}" target="_blank" rel="noopener"
                  class="hover:text-ieee transition-colors">
                 {{ paper.title }}
@@ -196,7 +196,7 @@
             <!-- Meta -->
             <div class="flex flex-col gap-1.5 mb-4">
               {% if paper.authors %}
-              <div class="flex items-start gap-2 text-sm text-slate-600">
+              <div class="flex items-start gap-2 text-base text-slate-600">
                 <i class="fa fa-users text-slate-400 mt-0.5 w-4 flex-shrink-0"></i>
                 <span>
                   {{ paper.authors[:5] | join(", ") }}{% if paper.authors | length > 5 %} <em class="text-slate-400">et al.</em>{% endif %}
@@ -204,13 +204,13 @@
               </div>
               {% endif %}
               {% if paper.publication_date %}
-              <div class="flex items-center gap-2 text-sm text-slate-500">
+              <div class="flex items-center gap-2 text-base text-slate-500">
                 <i class="fa fa-calendar-days text-slate-400 w-4 flex-shrink-0"></i>
                 <span>{{ paper.publication_date }}</span>
               </div>
               {% endif %}
               {% if paper.doi %}
-              <div class="flex items-center gap-2 text-sm text-slate-500 font-mono">
+              <div class="flex items-center gap-2 text-base text-slate-500 font-mono">
                 <i class="fa fa-fingerprint text-slate-400 w-4 flex-shrink-0"></i>
                 <span class="truncate">{{ paper.doi }}</span>
               </div>
@@ -221,11 +221,11 @@
             {% if paper.abstract %}
             <div class="abstract-region">
               <!-- Short version (default) -->
-              <p class="abstract-short collapsed text-sm text-slate-600 leading-relaxed">
+              <p class="abstract-short collapsed text-base text-slate-600 leading-relaxed">
                 {{ paper.short_abstract }}
               </p>
               <!-- Full version (revealed on expand; JS replaces content with fetched text) -->
-              <p class="abstract-full collapsed text-sm text-slate-600 leading-relaxed">
+              <p class="abstract-full collapsed text-base text-slate-600 leading-relaxed">
                 {{ paper.abstract }}
               </p>
               <!-- Shown only when every fetch source returned a snippet -->
@@ -235,7 +235,7 @@
                    class="underline hover:text-amber-800">view on IEEE Xplore</a>
               </p>
               {% if paper.abstract | length > 200 %}
-              <button class="abstract-toggle mt-2 text-sm text-ieee font-semibold hover:underline focus:outline-none"
+              <button class="abstract-toggle mt-2 text-base text-ieee font-semibold hover:underline focus:outline-none"
                       onclick="toggleAbstract(this)"
                       data-article="{{ paper.article_number }}"
                       data-loaded="false">
@@ -266,8 +266,8 @@
 
 <!-- ── Footer ──────────────────────────────────────────────── -->
 <footer class="text-center py-6 text-sm text-slate-400 border-t border-slate-100">
-  ⚡ IEEE Early Access Viewer ·
-  <a href="/refresh" class="hover:text-ieee transition-colors">🔄 Refresh data</a>
+  ⚡ For Genius, By Genius ·
+  <a href="/refresh" class="hover:text-ieee transition-colors">🔄 Wentao Zhang </a>
 </footer>
 
 <script>
