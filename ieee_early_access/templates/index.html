@@ -224,11 +224,17 @@
               <p class="abstract-short collapsed text-sm text-slate-600 leading-relaxed">
                 {{ paper.short_abstract }}
               </p>
-              <!-- Full version (on expand) -->
+              <!-- Full version (revealed on expand; JS replaces content with fetched text) -->
               <p class="abstract-full collapsed text-sm text-slate-600 leading-relaxed">
                 {{ paper.abstract }}
               </p>
-              {% if paper.abstract | length > 400 %}
+              <!-- Shown only when every fetch source returned a snippet -->
+              <p class="abstract-note hidden text-xs text-amber-600 mt-1">
+                📄 Full abstract unavailable via API —
+                <a href="{{ paper.url }}" target="_blank" rel="noopener"
+                   class="underline hover:text-amber-800">view on IEEE Xplore</a>
+              </p>
+              {% if paper.abstract | length > 200 %}
               <button class="abstract-toggle mt-2 text-sm text-ieee font-semibold hover:underline focus:outline-none"
                       onclick="toggleAbstract(this)"
                       data-article="{{ paper.article_number }}"
@@ -265,44 +271,63 @@
 </footer>
 
 <script>
-  /* ── Abstract toggle (lazy-fetches full abstract on first expand) ── */
+  /* ── Abstract toggle ────────────────────────────────────────────────────
+     First expand lazy-fetches the full abstract from the Flask proxy, which
+     tries the IEEE JSON API then HTML scraping. On collapse the card shrinks
+     back automatically because both paragraphs are in normal document flow.
+  ── */
   async function toggleAbstract(btn) {
     const region  = btn.closest('.abstract-region');
     const shortEl = region.querySelector('.abstract-short');
     const fullEl  = region.querySelector('.abstract-full');
+    const noteEl  = region.querySelector('.abstract-note');
     const isOpen  = fullEl.classList.contains('expanded');
 
     if (isOpen) {
-      // Collapse
-      fullEl.classList.replace('expanded', 'collapsed');
-      shortEl.classList.replace('expanded', 'collapsed');
+      // ── Collapse ──────────────────────────────────────────────────────────
+      fullEl.classList.replace('expanded',  'collapsed');
+      shortEl.classList.replace('collapsed', 'expanded');   // restore short
+      shortEl.classList.replace('expanded',  'collapsed');  // (idempotent guard)
+      if (noteEl) noteEl.classList.add('hidden');
       btn.textContent = 'Show more…';
       return;
     }
 
-    // First expand: fetch full abstract from proxy if not already loaded
+    // ── Expand ────────────────────────────────────────────────────────────
+    // Lazy-fetch on first open only; subsequent toggles use cached DOM content.
     const articleId = btn.dataset.article;
     if (articleId && btn.dataset.loaded !== 'true') {
-      const prev = btn.textContent;
+      const prev    = btn.textContent;
       btn.textContent = '⏳ Loading…';
-      btn.disabled = true;
+      btn.disabled    = true;
+
       try {
         const resp = await fetch('/abstract/' + articleId);
         if (resp.ok) {
           const data = await resp.json();
-          if (data.abstract) {
+
+          // Replace abstract content if the fetched text is longer
+          if (data.abstract && data.abstract.length > (fullEl.textContent || '').length) {
             fullEl.textContent = data.abstract;
-            btn.dataset.loaded = 'true';
           }
+
+          // Surface the truncation notice if all sources failed to get full text
+          if (data.truncated && noteEl) {
+            noteEl.classList.remove('hidden');
+          }
+
+          btn.dataset.loaded = 'true';
         }
-      } catch (_) { /* fall back to whatever the template already rendered */ }
-      btn.disabled = false;
+      } catch (_) {
+        // Network failure — fall back silently to whatever the template rendered
+      }
+
+      btn.disabled    = false;
       btn.textContent = prev;
     }
 
-    // Expand
     shortEl.classList.replace('collapsed', 'expanded');
-    fullEl.classList.replace('collapsed', 'expanded');
+    fullEl.classList.replace('collapsed',  'expanded');
     btn.textContent = 'Show less';
   }
 

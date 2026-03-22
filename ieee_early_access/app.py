@@ -92,11 +92,24 @@ def health():
 
 @app.route("/abstract/<article_number>")
 def get_abstract(article_number: str):
-    """Proxy: return the full abstract text for one IEEE article as JSON."""
+    """Proxy: return the full abstract for one IEEE article as JSON.
+
+    Response keys:
+        abstract  (str)  — full text, or empty on failure
+        source    (str)  — which source provided it
+        truncated (bool) — True when every source returned only a snippet
+    """
     if not article_number.isdigit():
-        return {"abstract": ""}, 400
-    abstract = fetch_article_abstract(article_number)
-    return {"abstract": abstract}
+        return {"abstract": "", "source": "none", "truncated": True}, 400
+    result = fetch_article_abstract(article_number)
+    app.logger.info(
+        "abstract proxy [%s] source=%s truncated=%s len=%d",
+        article_number,
+        result["source"],
+        result["truncated"],
+        len(result["abstract"]),
+    )
+    return result
 
 
 # ── static export ─────────────────────────────────────────────────────────────

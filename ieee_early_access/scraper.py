@@ -22,6 +22,8 @@ Robustness features:
 
 from __future__ import annotations
 
+import html as _html
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -61,6 +63,9 @@ _REQUEST_TIMEOUT = 20   # seconds
 _INTER_REQUEST_DELAY = 1.0  # seconds between requests (be polite)
 _PAGE_SIZE = 25  # records per page request
 _RETRY_BACKOFF = 2.0  # seconds; doubles each attempt
+
+# Abstracts shorter than this are treated as API snippets; trigger HTML fallback.
+_MIN_ABSTRACT_LEN = 600  # characters
 
 # Date formats returned by the IEEE Xplore API
 _DATE_FORMATS = [
@@ -352,24 +357,184 @@ def fetch_early_access_papers(
     )
 
 
-def fetch_article_abstract(article_number: str, session: requests.Session | None = None) -> str:
-    """Fetch the full abstract for one article from the IEEE Xplore document API.
+# ── abstract fetch helpers ────────────────────────────────────────────────────
 
-    The /rest/search endpoint returns truncated abstracts; this endpoint returns
-    the complete text.
+def _parse_json_object(text: str, start: int) -> dict | None:
+    """Extract the JSON object starting at text[start] using brace counting.
+
+    Plain regex can't handle arbitrarily nested braces, so we count manually.
+    Scans at most 600 000 characters to avoid runaway loops on malformed pages.
+    """
+    if start >= len(text) or text[start] != "{":
+        return None
+    depth = 0
+    in_string = False
+    skip_next = False
+    limit = min(start + 600_000, len(text))
+    for i in range(start, limit):
+        ch = text[i]
+        if skip_next:
+            skip_next = False
+            continue
+        if ch == "\\" and in_string:
+            skip_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[start : i + 1])
+                except (ValueError, json.JSONDecodeError):
+                    return None
+    return None
+
+
+def _try_api_abstract(article_number: str, session: requests.Session) -> str:
+    """Try IEEE JSON endpoints for the abstract, returning the longest result.
+
+    Tries the full document endpoint first; if the result is already long
+    enough we skip the sub-resource to save a round-trip.
+    """
+    best = ""
+    urls = [
+        f"https://ieeexplore.ieee.org/rest/document/{article_number}",
+        f"https://ieeexplore.ieee.org/rest/document/{article_number}/abstract",
+    ]
+    for url in urls:
+        try:
+            resp = session.get(url, headers=_HEADERS_POST, timeout=_REQUEST_TIMEOUT)
+            if not resp.ok:
+                continue
+            data = resp.json()
+            candidate = str(data.get("abstract") or data.get("abstractText") or "")
+            if len(candidate) > len(best):
+                best = candidate
+            if len(best) >= _MIN_ABSTRACT_LEN:
+                break  # good enough — skip remaining endpoints
+        except Exception:
+            continue
+    return _html.unescape(best) if best else ""
+
+
+def _try_html_abstract(article_number: str, session: requests.Session) -> str:
+    """Scrape the paper HTML page and extract the abstract from embedded metadata.
+
+    IEEE Xplore is a JavaScript SPA but embeds full article metadata in the
+    initial HTML for SEO. We probe three locations in priority order:
+      1. xplGlobal JS variable  — legacy and current IEEE Xplore deployments
+      2. __NEXT_DATA__ JSON      — Next.js style, used in newer deployments
+      3. JSON-LD structured data — schema.org ScholarlyArticle block
+
+    A 403 or timeout is caught and returns an empty string so the caller can
+    fall back gracefully without surfacing errors to the user.
+    """
+    url = f"https://ieeexplore.ieee.org/document/{article_number}"
+    try:
+        resp = session.get(url, headers=_HEADERS_GET, timeout=_REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        page = resp.text
+    except Exception:
+        return ""
+
+    # Strategy 1: xplGlobal = {...}
+    m = re.search(r"xplGlobal\s*=\s*\{", page)
+    if m:
+        data = _parse_json_object(page, m.end() - 1)
+        if data:
+            abstract = (
+                data.get("document", {}).get("metadata", {}).get("abstract")
+                or data.get("document", {}).get("abstract")
+                or data.get("metadata", {}).get("abstract")
+            )
+            if abstract:
+                return _html.unescape(str(abstract))
+
+    # Strategy 2: __NEXT_DATA__
+    m = re.search(
+        r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>\s*\{',
+        page,
+        re.IGNORECASE,
+    )
+    if m:
+        data = _parse_json_object(page, m.end() - 1)
+        if data:
+            try:
+                pp = data.get("props", {}).get("pageProps", {})
+                abstract = (
+                    pp.get("article", {}).get("abstract")
+                    or pp.get("abstract")
+                )
+                if abstract:
+                    return _html.unescape(str(abstract))
+            except (AttributeError, KeyError):
+                pass
+
+    # Strategy 3: JSON-LD
+    for m in re.finditer(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>\s*(\{|\[)',
+        page,
+        re.IGNORECASE,
+    ):
+        data = _parse_json_object(page, m.end() - 1)
+        if not data:
+            continue
+        if isinstance(data, list):
+            data = next((d for d in data if isinstance(d, dict)), {})
+        abstract = data.get("description") or data.get("abstract")
+        if abstract:
+            return _html.unescape(str(abstract))
+
+    return ""
+
+
+def fetch_article_abstract(
+    article_number: str,
+    session: requests.Session | None = None,
+) -> dict:
+    """Fetch the full abstract for one article using a waterfall of sources.
+
+    Sources tried in order (stops at the first result >= _MIN_ABSTRACT_LEN):
+      1. IEEE JSON API  (/rest/document/{id} and /rest/document/{id}/abstract)
+      2. HTML scraping  (xplGlobal → __NEXT_DATA__ → JSON-LD)
+      3. Best-effort    (returns whatever was found, marked truncated=True)
+
+    Returns a dict:
+        abstract  (str)  — the abstract text (empty string on total failure)
+        source    (str)  — "api" | "html" | "fallback" | "none"
+        truncated (bool) — True when every source returned a short snippet
     """
     own_session = session is None
     if own_session:
         session = requests.Session()
         _init_session(session)
     try:
-        url = f"https://ieeexplore.ieee.org/rest/document/{article_number}"
-        resp = session.get(url, headers=_HEADERS_POST, timeout=_REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("abstract") or data.get("abstractText") or ""
+        # Source 1: JSON API
+        api_text = _try_api_abstract(article_number, session)
+        if api_text and len(api_text) >= _MIN_ABSTRACT_LEN:
+            return {"abstract": api_text, "source": "api", "truncated": False}
+
+        # Source 2: HTML page scraping (small courtesy delay)
+        time.sleep(0.5)
+        html_text = _try_html_abstract(article_number, session)
+        if html_text and len(html_text) >= _MIN_ABSTRACT_LEN:
+            return {"abstract": html_text, "source": "html", "truncated": False}
+
+        # Best available (may still be a snippet)
+        best = api_text if len(api_text) >= len(html_text) else html_text
+        return {
+            "abstract": best,
+            "source": "fallback" if best else "none",
+            "truncated": True,
+        }
     except Exception:
-        return ""
+        return {"abstract": "", "source": "none", "truncated": True}
     finally:
         if own_session:
             session.close()
