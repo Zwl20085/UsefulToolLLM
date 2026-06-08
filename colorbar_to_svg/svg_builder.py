@@ -57,11 +57,16 @@ def build_svg(
     defs: list[str] = []
     body: list[str] = []
 
+    title_w = _est_text_w(title_text, font_size) if title_text else 0.0
+
     if orientation == "vertical":
-        bar_x = _PAD
         bar_y = _PAD + title_h
+        # Natural content width (bar + ticks + labels); widen if the title is longer.
+        content_w = _PAD + bar_thickness + _TICK_LEN + _GAP + max_label_w + _PAD
+        canvas_w = int(round(max(content_w, title_w + 2 * _PAD)))
+        dx = (canvas_w - content_w) / 2  # center content when the title widened the canvas
+        bar_x = _PAD + dx
         label_x = bar_x + bar_thickness + _TICK_LEN + _GAP
-        canvas_w = int(label_x + max_label_w + _PAD)
         canvas_h = int(bar_y + bar_length + _PAD)
 
         # Gradient: offset 0% (min) at bottom -> y1=1, y2=0.
@@ -105,17 +110,18 @@ def build_svg(
             )
 
         if title_text:
-            cx = bar_x + bar_thickness / 2
+            cx = canvas_w / 2
             body.append(
                 f'<text x="{cx:.2f}" y="{_PAD + font_size}" font-family="sans-serif" '
                 f'font-size="{font_size}" text-anchor="middle">{escape(title_text)}</text>'
             )
 
     else:  # horizontal
-        side_margin = max(_PAD, max_label_w / 2)
-        bar_x = side_margin
         bar_y = _PAD + title_h
-        canvas_w = int(bar_x + bar_length + side_margin)
+        side_margin = max(_PAD, max_label_w / 2)
+        content_w = bar_length + 2 * side_margin
+        canvas_w = int(round(max(content_w, title_w + 2 * _PAD)))
+        bar_x = (canvas_w - bar_length) / 2  # center bar; covers both label and title overhang
         canvas_h = int(bar_y + bar_thickness + _TICK_LEN + _GAP + font_size + _PAD)
 
         if mode == "gradient":
@@ -157,7 +163,7 @@ def build_svg(
             )
 
         if title_text:
-            cx = bar_x + bar_length / 2
+            cx = canvas_w / 2
             body.append(
                 f'<text x="{cx:.2f}" y="{_PAD + font_size}" font-family="sans-serif" '
                 f'font-size="{font_size}" text-anchor="middle">{escape(title_text)}</text>'
@@ -228,17 +234,22 @@ def render_preview_png(
         idx = np.minimum((np.arange(length) * n // length), n - 1)
         return arr[idx]
 
+    title_w = font.getlength(title_text) if title_text else 0.0
+
     if orientation == "vertical":
-        bar_x, bar_y = _PAD, _PAD + title_h
-        label_x = bar_x + bar_thickness + _TICK_LEN + _GAP
+        bar_y = _PAD + title_h
         max_label_w = max((font.getlength(lbl) for _, lbl in ticks), default=0)
-        canvas_w = int(label_x + max_label_w + _PAD)
+        content_w = _PAD + bar_thickness + _TICK_LEN + _GAP + max_label_w + _PAD
+        canvas_w = int(round(max(content_w, title_w + 2 * _PAD)))
+        dx = (canvas_w - content_w) / 2
+        bar_x = _PAD + dx
+        label_x = bar_x + bar_thickness + _TICK_LEN + _GAP
         canvas_h = int(bar_y + bar_length + _PAD)
         img = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
 
         strip = color_strip(bar_length)[::-1]  # row 0 = top = max
         block = np.repeat(strip[:, None, :], bar_thickness, axis=1)
-        img.paste(Image.fromarray(block), (bar_x, bar_y))
+        img.paste(Image.fromarray(block), (int(round(bar_x)), bar_y))
         draw = ImageDraw.Draw(img)
         if border:
             draw.rectangle(
@@ -251,22 +262,23 @@ def render_preview_png(
             draw.text((label_x, y), label, fill=(0, 0, 0), font=font, anchor="lm")
         if title_text:
             draw.text(
-                (bar_x + bar_thickness / 2, _PAD), title_text, fill=(0, 0, 0),
-                font=font, anchor="ma",
+                (canvas_w / 2, _PAD), title_text, fill=(0, 0, 0), font=font, anchor="ma"
             )
         return img
 
     # horizontal
     max_label_w = max((font.getlength(lbl) for _, lbl in ticks), default=0)
     side_margin = max(_PAD, max_label_w / 2)
-    bar_x, bar_y = side_margin, _PAD + title_h
-    canvas_w = int(bar_x + bar_length + side_margin)
+    bar_y = _PAD + title_h
+    content_w = bar_length + 2 * side_margin
+    canvas_w = int(round(max(content_w, title_w + 2 * _PAD)))
+    bar_x = (canvas_w - bar_length) / 2
     canvas_h = int(bar_y + bar_thickness + _TICK_LEN + _GAP + font_size + _PAD)
     img = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
 
     strip = color_strip(bar_length)  # index 0 = left = min
     block = np.repeat(strip[None, :, :], bar_thickness, axis=0)
-    img.paste(Image.fromarray(block), (int(bar_x), bar_y))
+    img.paste(Image.fromarray(block), (int(round(bar_x)), bar_y))
     draw = ImageDraw.Draw(img)
     if border:
         draw.rectangle(
@@ -280,6 +292,6 @@ def render_preview_png(
         draw.text((x, label_y), label, fill=(0, 0, 0), font=font, anchor="ma")
     if title_text:
         draw.text(
-            (bar_x + bar_length / 2, _PAD), title_text, fill=(0, 0, 0), font=font, anchor="ma"
+            (canvas_w / 2, _PAD), title_text, fill=(0, 0, 0), font=font, anchor="ma"
         )
     return img
