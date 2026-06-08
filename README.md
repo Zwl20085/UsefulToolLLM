@@ -7,7 +7,8 @@ A collection of research productivity tools.
 ```
 UsefulToolLLM/
 ├── ieee_early_access/   # Tool 1: IEEE Early Access Paper Viewer (Flask)
-└── image_cmap_gen/      # Tool 2: Image to Matplotlib Colormap Generator (Streamlit)
+├── image_cmap_gen/      # Tool 2: Image to Matplotlib Colormap Generator (Streamlit)
+└── colorbar_to_svg/     # Tool 3: Colorbar Screenshot to Clean SVG (Streamlit)
 ```
 
 ---
@@ -156,6 +157,58 @@ image_cmap_gen/
 | Pickle | `<name>.pkl` | `import pickle; cmap = pickle.load(open("name.pkl","rb"))` |
 
 Both formats produce a standard `matplotlib.colors.Colormap` object compatible with `plt.imshow`, `plt.scatter`, `plt.colorbar`, etc.
+
+---
+
+### `colorbar_to_svg/` — Colorbar Screenshot to Clean SVG
+
+Turn a **captured colorbar** from FE/CAE software (Abaqus, ANSYS, COMSOL) into a clean, publication-ready **SVG**. The post-processor's colorbar is auto-detected from a screenshot, and the usual wall of 12–15 tick values is replaced with a tidy **4–8 evenly-spaced labels**.
+
+#### Features
+
+- Upload a captured colorbar (PNG, JPEG, BMP, WebP, TIFF)
+- **Auto-detects** the colored strip and its orientation (vertical or horizontal) — no manual cropping needed in the common case
+- Manual region sliders + flip control to fix imperfect captures
+- You enter the **value range** (min, max, linear or log scale); no fragile OCR
+- Reduces labels to a clean **4–8 evenly-spaced** set with sensible number formatting (significant figures / scientific notation)
+- **Smooth gradient** or **discrete blocks** SVG output, with optional title and units
+- Live preview; one-click **SVG download** (scalable, editable in Inkscape/Illustrator)
+
+#### Quick Start
+
+```bash
+cd colorbar_to_svg
+
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Launch the app
+streamlit run app.py
+# → Opens http://localhost:8501 in your browser automatically
+```
+
+#### Project Structure
+
+```
+colorbar_to_svg/
+├── app.py             # Streamlit UI entry point
+├── strip_detector.py  # Auto-detect the colored strip (chroma-based) + orientation
+├── sampler.py         # Sample ordered colors along the strip (median across width)
+├── ticks.py           # Linear/log evenly-spaced tick values + number formatting
+├── svg_builder.py     # Hand-built SVG colorbar + matching raster preview
+├── utils.py           # load_image, resize_for_processing
+└── requirements.txt   # streamlit, Pillow, numpy
+```
+
+#### How It Works
+
+1. **Upload** a colorbar screenshot.
+2. The strip is located by **chroma** (`max(R,G,B) − min(R,G,B)`) — background, gray and text score ~0, while even dark-but-saturated colors stay high. Projection profiles give the bounding box and orientation.
+3. Colors are **sampled along the long axis** using a median across the short axis, so intruding tick marks, labels and borders are rejected.
+4. You enter min/max and pick linear or log; the tool generates **4–8 evenly-spaced** labels (min at the bottom for vertical bars, at the left for horizontal — flip if needed).
+5. A clean **SVG** is assembled (smooth `linearGradient` or discrete `rect` blocks) with tick marks, labels and an optional title/units.
+
+> No OCR is used — reading tiny tick fonts off screenshots is unreliable, so the numeric range is entered manually and labels are regenerated exactly.
 
 ---
 
