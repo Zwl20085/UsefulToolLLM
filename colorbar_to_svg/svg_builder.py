@@ -17,14 +17,15 @@ from PIL import Image, ImageDraw, ImageFont
 _PAD = 12
 _TICK_LEN = 6
 _GAP = 4
+_FONT = "Times New Roman, Times, serif"
 
 
 def _label_title(title: str, units: str) -> str:
     title, units = title.strip(), units.strip()
     if title and units:
-        return f"{title} [{units}]"
+        return f"{title} ({units})"
     if units:
-        return f"[{units}]"
+        return f"({units})"
     return title
 
 
@@ -104,7 +105,7 @@ def build_svg(
                 f'stroke="black" stroke-width="1"/>'
             )
             body.append(
-                f'<text x="{label_x}" y="{y:.2f}" font-family="sans-serif" '
+                f'<text x="{label_x}" y="{y:.2f}" font-family="{_FONT}" '
                 f'font-size="{font_size}" text-anchor="start" '
                 f'dominant-baseline="middle">{escape(label)}</text>'
             )
@@ -112,8 +113,9 @@ def build_svg(
         if title_text:
             cx = canvas_w / 2
             body.append(
-                f'<text x="{cx:.2f}" y="{_PAD + font_size}" font-family="sans-serif" '
-                f'font-size="{font_size}" text-anchor="middle">{escape(title_text)}</text>'
+                f'<text x="{cx:.2f}" y="{_PAD + font_size}" font-family="{_FONT}" '
+                f'font-size="{font_size}" font-weight="bold" '
+                f'text-anchor="middle">{escape(title_text)}</text>'
             )
 
     else:  # horizontal
@@ -158,15 +160,16 @@ def build_svg(
                 f'stroke="black" stroke-width="1"/>'
             )
             body.append(
-                f'<text x="{x:.2f}" y="{label_y:.2f}" font-family="sans-serif" '
+                f'<text x="{x:.2f}" y="{label_y:.2f}" font-family="{_FONT}" '
                 f'font-size="{font_size}" text-anchor="middle">{escape(label)}</text>'
             )
 
         if title_text:
             cx = canvas_w / 2
             body.append(
-                f'<text x="{cx:.2f}" y="{_PAD + font_size}" font-family="sans-serif" '
-                f'font-size="{font_size}" text-anchor="middle">{escape(title_text)}</text>'
+                f'<text x="{cx:.2f}" y="{_PAD + font_size}" font-family="{_FONT}" '
+                f'font-size="{font_size}" font-weight="bold" '
+                f'text-anchor="middle">{escape(title_text)}</text>'
             )
 
     parts.append(
@@ -196,8 +199,13 @@ def _gradient_stops(colors: list[tuple[int, int, int]]) -> str:
 # ── Raster preview (visually matches the SVG) ─────────────────────────────────
 
 
-def _load_font(size: int):
-    for name in ("arial.ttf", "DejaVuSans.ttf"):
+def _load_font(size: int, bold: bool = False):
+    names = (
+        ("timesbd.ttf", "DejaVuSerif-Bold.ttf", "Times New Roman Bold")
+        if bold
+        else ("times.ttf", "DejaVuSerif.ttf", "Times New Roman")
+    )
+    for name in names:
         try:
             return ImageFont.truetype(name, size)
         except OSError:
@@ -221,6 +229,7 @@ def render_preview_png(
     title_text = _label_title(title, units)
     title_h = int(font_size * 1.8) if title_text else 0
     font = _load_font(font_size)
+    title_font = _load_font(font_size, bold=True)
     n = max(1, len(colors))
     arr = np.array(colors if colors else [(0, 0, 0)], dtype=np.uint8)
 
@@ -234,7 +243,7 @@ def render_preview_png(
         idx = np.minimum((np.arange(length) * n // length), n - 1)
         return arr[idx]
 
-    title_w = font.getlength(title_text) if title_text else 0.0
+    title_w = title_font.getlength(title_text) if title_text else 0.0
 
     if orientation == "vertical":
         bar_y = _PAD + title_h
@@ -262,7 +271,7 @@ def render_preview_png(
             draw.text((label_x, y), label, fill=(0, 0, 0), font=font, anchor="lm")
         if title_text:
             draw.text(
-                (canvas_w / 2, _PAD), title_text, fill=(0, 0, 0), font=font, anchor="ma"
+                (canvas_w / 2, _PAD), title_text, fill=(0, 0, 0), font=title_font, anchor="ma"
             )
         return img
 
@@ -292,6 +301,6 @@ def render_preview_png(
         draw.text((x, label_y), label, fill=(0, 0, 0), font=font, anchor="ma")
     if title_text:
         draw.text(
-            (canvas_w / 2, _PAD), title_text, fill=(0, 0, 0), font=font, anchor="ma"
+            (canvas_w / 2, _PAD), title_text, fill=(0, 0, 0), font=title_font, anchor="ma"
         )
     return img
